@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ClipFlow</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <section id="authScreen" class="auth-screen">
+    <div class="auth-card">
+      <h1>ClipFlow</h1>
+      <p>Short videos. Your feed.</p>
+      <div class="tabs">
+        <button class="tab active" data-mode="login">Sign in</button>
+        <button class="tab" data-mode="signup">Create account</button>
+      </div>
+      <form id="authForm">
+        <input id="email" type="email" placeholder="Email" required>
+        <input id="password" type="password" minlength="6" placeholder="Password" required>
+        <input id="username" class="hidden" maxlength="20" placeholder="Username">
+        <button class="primary" id="authSubmit">Sign in</button>
+      </form>
+      <p id="authMessage" class="message"></p>
+    </div>
+  </section>
+
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <strong>ClipFlow</strong>
+      <nav>
+        <button class="nav-btn active" data-feed="fyp">For You</button>
+        <button class="nav-btn" data-feed="following">Following</button>
+      </nav>
+      <div class="user-menu"><span id="currentUser"></span><button id="logoutBtn">Log out</button></div>
+    </header>
+
+    <main id="feed" class="feed"></main>
+    <button id="uploadOpenBtn" class="upload-fab">＋ Upload</button>
+
+    <div id="uploadModal" class="modal hidden">
+      <div class="modal-card">
+        <button class="close" id="uploadCloseBtn">×</button>
+        <h2>Upload a video</h2>
+        <form id="uploadForm">
+          <label class="file-label">Choose video
+            <input id="videoFile" type="file" accept="video/*" required>
+          </label>
+          <input id="caption" maxlength="120" placeholder="Write a caption...">
+          <button class="primary">Post video</button>
+          <p id="uploadMessage" class="message"></p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
