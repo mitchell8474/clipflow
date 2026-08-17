@@ -69,22 +69,47 @@ $("#uploadForm").onsubmit = async e => {
   e.preventDefault();
   const file = $("#videoFile").files[0];
   if (!file || !file.type.startsWith("video/")) return msg("#uploadMessage","Choose a video.");
-  if (file.size > 100 * 1024 * 1024) return msg("#uploadMessage","Keep videos under 100 MB for this starter.");
+  if (file.size > 100 * 1024 * 1024) return msg("#uploadMessage","Keep videos under 100 MB.");
+
   try {
     msg("#uploadMessage","Uploading...");
-    const path = `${user.id}/${crypto.randomUUID()}-${safeName(file.name)}`;
+
+    // Fetch active session user ID dynamically to prevent stale state mismatches
+    const { data: { session } } = await supabase.auth.getSession();
+    const activeUserId = session?.user?.id || user?.id;
+
+    if (!activeUserId) throw new Error("Please log in again before uploading.");
+
+    // Fallback check to guarantee profile exists in public.profiles table
+    const { data: profile } = await supabase.from("profiles").select("id").eq("id", activeUserId).maybeSingle();
+    if (!profile) {
+      const tempUsername = "user_" + activeUserId.slice(0, 6);
+      await supabase.from("profiles").insert({ id: activeUserId, username: tempUsername });
+    }
+
+    const path = `${activeUserId}/${crypto.randomUUID()}-${safeName(file.name)}`;
     const { error: uploadError } = await supabase.storage.from("videos").upload(path, file, { contentType: file.type, upsert: false });
     if (uploadError) throw uploadError;
-    
+
     const { data: urlData } = supabase.storage.from("videos").getPublicUrl(path);
+
     const { error } = await supabase.from("videos").insert({
-      owner_id: user.id, storage_path: path, video_url: urlData.publicUrl, caption: $("#caption").value.trim()
+      owner_id: activeUserId,
+      storage_path: path,
+      video_url: urlData.publicUrl,
+      caption: $("#caption").value.trim()
     });
+
     if (error) throw error;
-    
-    $("#uploadForm").reset(); $("#uploadModal").classList.add("hidden"); msg("#uploadMessage","");
+
+    $("#uploadForm").reset();
+    $("#uploadModal").classList.add("hidden");
+    msg("#uploadMessage","");
     loadFeed();
-  } catch(e) { console.error(e); msg("#uploadMessage", e.message); }
+  } catch(e) {
+    console.error(e);
+    msg("#uploadMessage", e.message);
+  }
 };
 
 async function loadFeed() {
@@ -131,7 +156,7 @@ async function loadFeed() {
     const username = v.profiles?.username || "creator";
     const likeCount = v.likes?.[0]?.count || 0, repostCount = v.reposts?.[0]?.count || 0;
     const isFollowing = following.includes(v.owner_id);
-    const isOwner = user && v.owner_id === user.id;
+    const isOwner = user && v.owner_id === v.owner_id;
 
     card.innerHTML = `
       <video class="video-player" loop playsinline preload="metadata" muted src="${v.video_url}"></video>
