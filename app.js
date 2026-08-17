@@ -74,13 +74,11 @@ $("#uploadForm").onsubmit = async e => {
   try {
     msg("#uploadMessage","Uploading...");
 
-    // Fetch active session user ID dynamically to prevent stale state mismatches
     const { data: { session } } = await supabase.auth.getSession();
     const activeUserId = session?.user?.id || user?.id;
 
     if (!activeUserId) throw new Error("Please log in again before uploading.");
 
-    // Fallback check to guarantee profile exists in public.profiles table
     const { data: profile } = await supabase.from("profiles").select("id").eq("id", activeUserId).maybeSingle();
     if (!profile) {
       const tempUsername = "user_" + activeUserId.slice(0, 6);
@@ -155,8 +153,8 @@ async function loadFeed() {
     const card = document.createElement("article"); card.className = "video-card";
     const username = v.profiles?.username || "creator";
     const likeCount = v.likes?.[0]?.count || 0, repostCount = v.reposts?.[0]?.count || 0;
+    const isFollowing = following.includes(v.owner_id);
     const isOwner = user && v.owner_id === user.id;
-    const isOwner = user && v.owner_id === v.owner_id;
 
     card.innerHTML = `
       <video class="video-player" loop playsinline preload="metadata" muted src="${v.video_url}"></video>
