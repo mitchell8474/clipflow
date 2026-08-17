@@ -29,6 +29,18 @@
     <header class="topbar">
       <strong>ClipFlow</strong>
       <nav>
+        <!-- Inside your main navigation bar in index.html -->
+<div class="nav-bar">
+  <button class="nav-btn active" data-feed="fyp">For You</button>
+  <button class="nav-btn" data-feed="following">Following</button>
+  <button id="uploadOpenBtn" class="upload-btn">+ Upload</button>
+  
+  <!-- Add this Admin button -->
+  <button id="adminOpenBtn" class="admin-open-btn hidden">⚡ Admin</button>
+
+  <span id="currentUser"></span>
+  <button id="logoutBtn">Sign Out</button>
+</div>
         <button class="nav-btn active" data-feed="fyp">For You</button>
         <button class="nav-btn" data-feed="following">Following</button>
       </nav>
