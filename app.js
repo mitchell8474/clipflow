@@ -174,10 +174,25 @@ async function loadFeed() {
     const followBtn = card.querySelector(".follow-btn"), likeBtn = card.querySelector(".like-btn"), repostBtn = card.querySelector(".repost-btn");
     followBtn.disabled = isOwner;
 
+    // Instant UI toggle for follow button
     followBtn.onclick = async () => { 
+      if (!user) return alert("Please sign in to follow creators.");
+
+      const currentlyFollowing = followBtn.classList.contains("following");
+      followBtn.classList.toggle("following", !currentlyFollowing);
+      followBtn.textContent = !currentlyFollowing ? "Following" : "Follow";
+
       const { error } = await supabase.rpc("toggle_follow", { target_user_id: v.owner_id }); 
-      if (error) alert(error.message); else loadFeed(); 
+      if (error) {
+        // Revert UI if server action fails
+        followBtn.classList.toggle("following", currentlyFollowing);
+        followBtn.textContent = currentlyFollowing ? "Following" : "Follow";
+        alert(error.message); 
+      } else {
+        loadFeed(); 
+      }
     };
+
     likeBtn.onclick = async () => { 
       const { error } = await supabase.rpc("toggle_like", { target_video_id: v.id }); 
       if (error) alert(error.message); else loadFeed(); 
