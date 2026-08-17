@@ -112,6 +112,74 @@ $("#uploadForm").onsubmit = async e => {
   }
 };
 
+// --- Super Admin Panel Handlers ---
+const adminOpenBtn = $("#adminOpenBtn");
+const adminCloseBtn = $("#adminCloseBtn");
+
+if (adminOpenBtn) {
+  adminOpenBtn.onclick = async () => {
+    $("#adminModal").classList.remove("hidden");
+    msg("#adminMessage", "");
+
+    const { data: videos } = await supabase.from("videos").select("id, caption");
+    const select = $("#adminVideoSelect");
+    select.innerHTML = "";
+    
+    (videos || []).forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v.id;
+      opt.textContent = v.caption ? v.caption.slice(0, 30) : v.id;
+      select.appendChild(opt);
+    });
+  };
+}
+
+if (adminCloseBtn) {
+  adminCloseBtn.onclick = () => $("#adminModal").classList.add("hidden");
+}
+
+const addLikesBtn = $("#addLikesBtn");
+if (addLikesBtn) {
+  addLikesBtn.onclick = async () => {
+    const videoId = $("#adminVideoSelect").value;
+    if (!videoId) return;
+
+    msg("#adminMessage", "Adding 5,000 likes...");
+    const { error } = await supabase.rpc("admin_add_likes", { 
+      target_video_id: videoId, 
+      amount: 5000 
+    });
+
+    if (error) {
+      msg("#adminMessage", "Error: " + error.message);
+    } else {
+      msg("#adminMessage", "Successfully added 5,000 likes!");
+      loadFeed();
+    }
+  };
+}
+
+const deleteVideoBtn = $("#deleteVideoBtn");
+if (deleteVideoBtn) {
+  deleteVideoBtn.onclick = async () => {
+    const videoId = $("#adminVideoSelect").value;
+    if (!videoId) return;
+
+    msg("#adminMessage", "Deleting video...");
+    const { error } = await supabase.rpc("admin_delete_video", { 
+      target_video_id: videoId 
+    });
+
+    if (error) {
+      msg("#adminMessage", "Error: " + error.message);
+    } else {
+      msg("#adminMessage", "Video deleted!");
+      $("#adminModal").classList.add("hidden");
+      loadFeed();
+    }
+  };
+}
+
 // --- Main Feed & Lazy Load Logic ---
 async function loadFeed() {
   const feed = $("#feed"); feed.innerHTML = "";
@@ -183,13 +251,11 @@ async function loadFeed() {
     const repostBtn = card.querySelector(".repost-btn");
     followBtn.disabled = isOwner;
 
-    // --- FIXED FOLLOW LOGIC ---
     followBtn.onclick = async () => { 
       if (!user) return alert("Please sign in to follow creators.");
 
       const currentlyFollowing = followBtn.classList.contains("following");
       
-      // Update UI immediately
       document.querySelectorAll(".video-card").forEach(c => {
         const creatorBtn = c.querySelector(".creator");
         if (creatorBtn && creatorBtn.textContent === `@${username}`) {
@@ -201,7 +267,6 @@ async function loadFeed() {
         }
       });
 
-      // Direct Database Insert/Delete instead of RPC
       let dbError = null;
       if (currentlyFollowing) {
         const { error } = await supabase.from("follows").delete().eq("follower_id", user.id).eq("following_id", v.owner_id);
@@ -212,7 +277,6 @@ async function loadFeed() {
       }
 
       if (dbError) {
-        // Rollback UI if database fails
         document.querySelectorAll(".video-card").forEach(c => {
           const creatorBtn = c.querySelector(".creator");
           if (creatorBtn && creatorBtn.textContent === `@${username}`) {
@@ -229,7 +293,6 @@ async function loadFeed() {
       }
     };
 
-    // --- FIXED LIKE LOGIC ---
     likeBtn.onclick = async () => { 
       if (!user) return alert("Please sign in to like videos.");
 
@@ -256,7 +319,6 @@ async function loadFeed() {
       }
     };
 
-    // --- FIXED REPOST LOGIC ---
     repostBtn.onclick = async () => { 
       if (!user) return alert("Please sign in to repost videos.");
 
