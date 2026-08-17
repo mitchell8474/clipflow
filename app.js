@@ -9,6 +9,7 @@ let user = null, feedMode = "fyp", observer;
 const $ = s => document.querySelector(s);
 const msg = (id, text) => $(id).textContent = text;
 
+// --- Auth Tabs & Form Handlers ---
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
   b.classList.add("active");
@@ -62,6 +63,7 @@ document.querySelectorAll(".nav-btn").forEach(b => b.onclick = () => {
   b.classList.add("active"); loadFeed();
 });
 
+// --- Upload Handlers ---
 $("#uploadOpenBtn").onclick = () => $("#uploadModal").classList.remove("hidden");
 $("#uploadCloseBtn").onclick = () => $("#uploadModal").classList.add("hidden");
 
@@ -110,10 +112,73 @@ $("#uploadForm").onsubmit = async e => {
   }
 };
 
+// --- Super Admin Panel Handlers ---
+if ($("#adminOpenBtn")) {
+  $("#adminOpenBtn").onclick = async () => {
+    $("#adminModal").classList.remove("hidden");
+    msg("#adminMessage", "");
+
+    const { data: videos } = await supabase.from("videos").select("id, caption");
+    const select = $("#adminVideoSelect");
+    select.innerHTML = "";
+    
+    (videos || []).forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v.id;
+      opt.textContent = v.caption ? v.caption.slice(0, 30) : v.id;
+      select.appendChild(opt);
+    });
+  };
+}
+
+if ($("#adminCloseBtn")) {
+  $("#adminCloseBtn").onclick = () => $("#adminModal").classList.add("hidden");
+}
+
+if ($("#addLikesBtn")) {
+  $("#addLikesBtn").onclick = async () => {
+    const videoId = $("#adminVideoSelect").value;
+    if (!videoId) return;
+
+    msg("#adminMessage", "Adding 5,000 likes...");
+    const { error } = await supabase.rpc("admin_add_likes", { 
+      target_video_id: videoId, 
+      amount: 5000 
+    });
+
+    if (error) {
+      msg("#adminMessage", "Error: " + error.message);
+    } else {
+      msg("#adminMessage", "Successfully added 5,000 likes!");
+      loadFeed();
+    }
+  };
+}
+
+if ($("#deleteVideoBtn")) {
+  $("#deleteVideoBtn").onclick = async () => {
+    const videoId = $("#adminVideoSelect").value;
+    if (!videoId) return;
+
+    msg("#adminMessage", "Deleting video...");
+    const { error } = await supabase.rpc("admin_delete_video", { 
+      target_video_id: videoId 
+    });
+
+    if (error) {
+      msg("#adminMessage", "Error: " + error.message);
+    } else {
+      msg("#adminMessage", "Video deleted!");
+      $("#adminModal").classList.add("hidden");
+      loadFeed();
+    }
+  };
+}
+
+// --- Main Feed & Interaction Logic ---
 async function loadFeed() {
   const feed = $("#feed"); feed.innerHTML = "";
 
-  // 1. Fetch User Profile Relations safely
   let profile = { following: [], liked: [], reposted: [] };
   if (user) {
     const { data: pData } = await supabase
@@ -124,7 +189,6 @@ async function loadFeed() {
     if (pData) profile = pData;
   }
 
-  // 2. Query Videos (Explicitly referencing owner_id relation)
   let { data: videos, error } = await supabase
     .from("videos")
     .select("id, owner_id, caption, video_url, created_at, profiles!owner_id(username), likes(count), reposts(count)")
@@ -148,7 +212,6 @@ async function loadFeed() {
     return;
   }
 
-  // 3. Build & Render Cards
   for (const v of videos) {
     const card = document.createElement("article"); card.className = "video-card";
     const username = v.profiles?.username || "creator";
@@ -176,13 +239,11 @@ async function loadFeed() {
     const repostBtn = card.querySelector(".repost-btn");
     followBtn.disabled = isOwner;
 
-    // Direct Follow toggle without feed reload
     followBtn.onclick = async () => { 
       if (!user) return alert("Please sign in to follow creators.");
 
       const currentlyFollowing = followBtn.classList.contains("following");
       
-      // Update all follow buttons across the app for this creator
       document.querySelectorAll(".video-card").forEach(c => {
         if (c.querySelector(".creator").textContent === `@${username}`) {
           const btn = c.querySelector(".follow-btn");
@@ -195,7 +256,6 @@ async function loadFeed() {
 
       const { error } = await supabase.rpc("toggle_follow", { target_user_id: v.owner_id }); 
       if (error) {
-        // Revert on failure
         document.querySelectorAll(".video-card").forEach(c => {
           if (c.querySelector(".creator").textContent === `@${username}`) {
             const btn = c.querySelector(".follow-btn");
@@ -209,7 +269,6 @@ async function loadFeed() {
       }
     };
 
-    // Direct Like toggle without feed reload
     likeBtn.onclick = async () => { 
       if (!user) return alert("Please sign in to like videos.");
 
@@ -228,7 +287,6 @@ async function loadFeed() {
       }
     };
 
-    // Direct Repost toggle without feed reload
     repostBtn.onclick = async () => { 
       if (!user) return alert("Please sign in to repost videos.");
 
@@ -270,16 +328,27 @@ function setupObserver() {
 function safeName(n) { return n.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80); }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c])); }
 
-supabase.auth.onAuthStateChange((_event, session) => {
+// --- Auth State Change Listener ---
+supabase.auth.onAuthStateChange(async (_event, session) => {
   user = session?.user || null;
   $("#authScreen").classList.toggle("hidden", !!user); 
   $("#app").classList.toggle("hidden", !user);
   
   if (user) {
-    supabase.from("profiles").select("username").eq("id", user.id).single().then(({ data }) => {
-      $("#currentUser").textContent = "@" + (data?.username || user.email); 
-      loadFeed();
-    });
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("username, is_admin")
+      .eq("id", user.id)
+      .single();
+
+    $("#currentUser").textContent = "@" + (profile?.username || user.email);
+
+    const adminBtn = $("#adminOpenBtn");
+    if (adminBtn) {
+      adminBtn.classList.toggle("hidden", !profile?.is_admin);
+    }
+
+    loadFeed();
   } else {
     loadFeed();
   }
