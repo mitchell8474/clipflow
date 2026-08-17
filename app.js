@@ -204,18 +204,21 @@ async function loadFeed() {
 
   const following = profile.following || [];
   if (feedMode === "following" && user) {
-    videos = (videos || []).filter(v => following.includes(v.owner_id) || v.owner_id === user.id);
+    videos = (videos || []).filter(v => following.includes(v.owner_id));
   }
 
   const liked = new Set(profile.liked || []);
   const reposted = new Set(profile.reposted || []);
 
   if (!videos || !videos.length) {
-    feed.innerHTML = `<section class="video-card"><div style="margin:auto;text-align:center"><h2>No videos here yet.</h2><p>Upload one to get started!</p></div></section>`; 
+    const emptyMsg = feedMode === "following" 
+      ? "<h2>No videos in your Following feed yet.</h2><p>Follow creators to see their videos here!</p>"
+      : "<h2>No videos here yet.</h2><p>Upload one to get started!</p>";
+    feed.innerHTML = `<section class="video-card"><div style="margin:auto;text-align:center">${emptyMsg}</div></section>`; 
     return;
   }
 
-  videos.forEach((v, index) => {
+  videos.forEach((v) => {
     const card = document.createElement("article"); 
     card.className = "video-card";
     const username = v.profiles?.username || "creator";
@@ -223,7 +226,6 @@ async function loadFeed() {
     const isFollowing = following.includes(v.owner_id);
     const isOwner = user && v.owner_id === user.id;
 
-    // Use data-src for memory optimization on low-end devices
     card.innerHTML = `
       <video class="video-player" loop playsinline preload="metadata" muted data-src="${v.video_url}"></video>
       <div class="video-gradient"></div>
@@ -249,8 +251,10 @@ async function loadFeed() {
 
       const currentlyFollowing = followBtn.classList.contains("following");
       
+      // Update all cards belonging to the same owner across the DOM instantly
       document.querySelectorAll(".video-card").forEach(c => {
-        if (c.querySelector(".creator").textContent === `@${username}`) {
+        const creatorBtn = c.querySelector(".creator");
+        if (creatorBtn && creatorBtn.textContent === `@${username}`) {
           const btn = c.querySelector(".follow-btn");
           if (btn && !btn.disabled) {
             btn.classList.toggle("following", !currentlyFollowing);
@@ -261,8 +265,10 @@ async function loadFeed() {
 
       const { error } = await supabase.rpc("toggle_follow", { target_user_id: v.owner_id }); 
       if (error) {
+        // Rollback state if database mutation fails
         document.querySelectorAll(".video-card").forEach(c => {
-          if (c.querySelector(".creator").textContent === `@${username}`) {
+          const creatorBtn = c.querySelector(".creator");
+          if (creatorBtn && creatorBtn.textContent === `@${username}`) {
             const btn = c.querySelector(".follow-btn");
             if (btn && !btn.disabled) {
               btn.classList.toggle("following", currentlyFollowing);
@@ -271,6 +277,11 @@ async function loadFeed() {
           }
         });
         alert(error.message); 
+      } else {
+        // Refresh feed if we are in "Following" mode so unfollowed videos disappear immediately
+        if (feedMode === "following") {
+          loadFeed();
+        }
       }
     };
 
