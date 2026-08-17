@@ -69,3 +69,77 @@ body { background: #000; color: #fff; overflow: hidden; }
 #commentForm { display: flex; gap: 10px; }
 #commentInput { flex: 1; padding: 10px; background: #333; color: white; border: 1px solid #444; border-radius: 20px; outline: none; }
 #commentForm button { padding: 0 15px; background: transparent; color: #ea4335; font-weight: bold; border: none; cursor: pointer; }
+/* =========================================
+   LIQUID GLASS EFFECT FOR MAIN BUTTONS
+   ========================================= */
+
+/* Target Auth, Upload, Admin, and Comment Post buttons */
+#authForm button, 
+#uploadForm button, 
+#adminModal button,
+#commentForm button,
+.follow-btn {
+  background: rgba(255, 255, 255, 0.1) !important; /* Semi-transparent white */
+  backdrop-filter: blur(10px) !important; /* The core glass blur effect */
+  -webkit-backdrop-filter: blur(10px) !important; /* For Safari support */
+  border: 1px solid rgba(255, 255, 255, 0.2) !important; /* Subtle frosted edge */
+  border-top: 1px solid rgba(255, 255, 255, 0.4) !important; /* Top highlight for liquid look */
+  border-left: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important; /* Soft shadow below */
+  color: #fff !important;
+  border-radius: 12px !important;
+  transition: all 0.3s ease !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* Glass effect on hover */
+#authForm button:hover, 
+#uploadForm button:hover, 
+#adminModal button:hover,
+#commentForm button:hover,
+.follow-btn:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 8px 32px 0 rgba(255, 255, 255, 0.1) !important;
+  transform: translateY(-2px); /* Slight lift effect */
+}
+
+/* Active/Click effect */
+#authForm button:active, 
+#uploadForm button:active, 
+#adminModal button:active,
+#commentForm button:active,
+.follow-btn:active {
+  transform: translateY(1px);
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Adjust the Follow button specifically so it fits the video overlay */
+.follow-btn {
+  padding: 4px 12px !important;
+  border-radius: 20px !important; /* More pill-shaped for the feed */
+}
+
+/* When the user is already following, make the glass darker/more transparent */
+.follow-btn.following {
+  background: rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #ccc !important;
+}
+
+/* Optional: Make the auth tabs at the top look glassy too */
+.auth-tabs {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 5px;
+  border-bottom: none;
+}
+.tab.active {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  border-bottom: none;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
