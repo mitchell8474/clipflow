@@ -112,69 +112,6 @@ $("#uploadForm").onsubmit = async e => {
   }
 };
 
-// --- Super Admin Panel Handlers ---
-if ($("#adminOpenBtn")) {
-  $("#adminOpenBtn").onclick = async () => {
-    $("#adminModal").classList.remove("hidden");
-    msg("#adminMessage", "");
-
-    const { data: videos } = await supabase.from("videos").select("id, caption");
-    const select = $("#adminVideoSelect");
-    select.innerHTML = "";
-    
-    (videos || []).forEach(v => {
-      const opt = document.createElement("option");
-      opt.value = v.id;
-      opt.textContent = v.caption ? v.caption.slice(0, 30) : v.id;
-      select.appendChild(opt);
-    });
-  };
-}
-
-if ($("#adminCloseBtn")) {
-  $("#adminCloseBtn").onclick = () => $("#adminModal").classList.add("hidden");
-}
-
-if ($("#addLikesBtn")) {
-  $("#addLikesBtn").onclick = async () => {
-    const videoId = $("#adminVideoSelect").value;
-    if (!videoId) return;
-
-    msg("#adminMessage", "Adding 5,000 likes...");
-    const { error } = await supabase.rpc("admin_add_likes", { 
-      target_video_id: videoId, 
-      amount: 5000 
-    });
-
-    if (error) {
-      msg("#adminMessage", "Error: " + error.message);
-    } else {
-      msg("#adminMessage", "Successfully added 5,000 likes!");
-      loadFeed();
-    }
-  };
-}
-
-if ($("#deleteVideoBtn")) {
-  $("#deleteVideoBtn").onclick = async () => {
-    const videoId = $("#adminVideoSelect").value;
-    if (!videoId) return;
-
-    msg("#adminMessage", "Deleting video...");
-    const { error } = await supabase.rpc("admin_delete_video", { 
-      target_video_id: videoId 
-    });
-
-    if (error) {
-      msg("#adminMessage", "Error: " + error.message);
-    } else {
-      msg("#adminMessage", "Video deleted!");
-      $("#adminModal").classList.add("hidden");
-      loadFeed();
-    }
-  };
-}
-
 // --- Main Feed & Lazy Load Logic ---
 async function loadFeed() {
   const feed = $("#feed"); feed.innerHTML = "";
@@ -246,12 +183,13 @@ async function loadFeed() {
     const repostBtn = card.querySelector(".repost-btn");
     followBtn.disabled = isOwner;
 
+    // --- FIXED FOLLOW LOGIC ---
     followBtn.onclick = async () => { 
       if (!user) return alert("Please sign in to follow creators.");
 
       const currentlyFollowing = followBtn.classList.contains("following");
       
-      // Update all cards belonging to the same owner across the DOM instantly
+      // Update UI immediately
       document.querySelectorAll(".video-card").forEach(c => {
         const creatorBtn = c.querySelector(".creator");
         if (creatorBtn && creatorBtn.textContent === `@${username}`) {
@@ -263,9 +201,18 @@ async function loadFeed() {
         }
       });
 
-      const { error } = await supabase.rpc("toggle_follow", { target_user_id: v.owner_id }); 
-      if (error) {
-        // Rollback state if database mutation fails
+      // Direct Database Insert/Delete instead of RPC
+      let dbError = null;
+      if (currentlyFollowing) {
+        const { error } = await supabase.from("follows").delete().eq("follower_id", user.id).eq("following_id", v.owner_id);
+        dbError = error;
+      } else {
+        const { error } = await supabase.from("follows").insert({ follower_id: user.id, following_id: v.owner_id });
+        dbError = error;
+      }
+
+      if (dbError) {
+        // Rollback UI if database fails
         document.querySelectorAll(".video-card").forEach(c => {
           const creatorBtn = c.querySelector(".creator");
           if (creatorBtn && creatorBtn.textContent === `@${username}`) {
@@ -276,15 +223,13 @@ async function loadFeed() {
             }
           }
         });
-        alert(error.message); 
+        alert("Error updating follow status: " + dbError.message); 
       } else {
-        // Refresh feed if we are in "Following" mode so unfollowed videos disappear immediately
-        if (feedMode === "following") {
-          loadFeed();
-        }
+        if (feedMode === "following") loadFeed();
       }
     };
 
+    // --- FIXED LIKE LOGIC ---
     likeBtn.onclick = async () => { 
       if (!user) return alert("Please sign in to like videos.");
 
@@ -295,14 +240,23 @@ async function loadFeed() {
       likeBtn.classList.toggle("liked", !isLiked);
       countEl.textContent = !isLiked ? currentCount + 1 : Math.max(0, currentCount - 1);
 
-      const { error } = await supabase.rpc("toggle_like", { target_video_id: v.id }); 
-      if (error) {
+      let dbError = null;
+      if (isLiked) {
+        const { error } = await supabase.from("likes").delete().eq("user_id", user.id).eq("video_id", v.id);
+        dbError = error;
+      } else {
+        const { error } = await supabase.from("likes").insert({ user_id: user.id, video_id: v.id });
+        dbError = error;
+      }
+
+      if (dbError) {
         likeBtn.classList.toggle("liked", isLiked);
         countEl.textContent = currentCount;
-        alert(error.message); 
+        console.error(dbError);
       }
     };
 
+    // --- FIXED REPOST LOGIC ---
     repostBtn.onclick = async () => { 
       if (!user) return alert("Please sign in to repost videos.");
 
@@ -313,11 +267,19 @@ async function loadFeed() {
       repostBtn.classList.toggle("reposted", !isReposted);
       countEl.textContent = !isReposted ? currentCount + 1 : Math.max(0, currentCount - 1);
 
-      const { error } = await supabase.rpc("toggle_repost", { target_video_id: v.id }); 
-      if (error) {
+      let dbError = null;
+      if (isReposted) {
+        const { error } = await supabase.from("reposts").delete().eq("user_id", user.id).eq("video_id", v.id);
+        dbError = error;
+      } else {
+        const { error } = await supabase.from("reposts").insert({ user_id: user.id, video_id: v.id });
+        dbError = error;
+      }
+
+      if (dbError) {
         repostBtn.classList.toggle("reposted", isReposted);
         countEl.textContent = currentCount;
-        alert(error.message); 
+        console.error(dbError);
       }
     };
 
@@ -327,10 +289,8 @@ async function loadFeed() {
   setupObserver();
 }
 
-// Low-End Device Optimized Intersection Observer
 function setupObserver() {
   if (observer) observer.disconnect();
-  
   const cards = Array.from(document.querySelectorAll(".video-card"));
   
   observer = new IntersectionObserver(entries => {
@@ -340,7 +300,6 @@ function setupObserver() {
       const cardIndex = cards.indexOf(card);
 
       if (e.isIntersecting && e.intersectionRatio > 0.6) {
-        // Preload video stream for current, previous, and next item only
         [cardIndex - 1, cardIndex, cardIndex + 1].forEach(i => {
           if (cards[i]) {
             const targetVideo = cards[i].querySelector("video");
@@ -354,9 +313,7 @@ function setupObserver() {
           if (x !== v) x.pause();
         });
         
-        if (v.src) {
-          v.play().catch(() => {});
-        }
+        if (v.src) v.play().catch(() => {});
       } else {
         v.pause();
       }
