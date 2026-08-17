@@ -175,18 +175,21 @@ if ($("#deleteVideoBtn")) {
   };
 }
 
-// --- Main Feed & Interaction Logic ---
+// --- Main Feed & Lazy Load Logic ---
 async function loadFeed() {
   const feed = $("#feed"); feed.innerHTML = "";
 
   let profile = { following: [], liked: [], reposted: [] };
   if (user) {
-    const { data: pData } = await supabase
-      .from("profiles")
-      .select("username, following:following(following_id), liked:likes(video_id), reposted:reposts(video_id)")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (pData) profile = pData;
+    const [followsRes, likesRes, repostsRes] = await Promise.all([
+      supabase.from("follows").select("following_id").eq("follower_id", user.id),
+      supabase.from("likes").select("video_id").eq("user_id", user.id),
+      supabase.from("reposts").select("video_id").eq("user_id", user.id)
+    ]);
+
+    profile.following = (followsRes.data || []).map(x => x.following_id);
+    profile.liked = (likesRes.data || []).map(x => x.video_id);
+    profile.reposted = (repostsRes.data || []).map(x => x.video_id);
   }
 
   let { data: videos, error } = await supabase
@@ -199,28 +202,30 @@ async function loadFeed() {
     videos = [];
   }
 
-  const following = (profile.following || []).map(x => x.following_id);
+  const following = profile.following || [];
   if (feedMode === "following" && user) {
     videos = (videos || []).filter(v => following.includes(v.owner_id) || v.owner_id === user.id);
   }
 
-  const liked = new Set((profile.liked || []).map(x => x.video_id));
-  const reposted = new Set((profile.reposted || []).map(x => x.video_id));
+  const liked = new Set(profile.liked || []);
+  const reposted = new Set(profile.reposted || []);
 
   if (!videos || !videos.length) {
     feed.innerHTML = `<section class="video-card"><div style="margin:auto;text-align:center"><h2>No videos here yet.</h2><p>Upload one to get started!</p></div></section>`; 
     return;
   }
 
-  for (const v of videos) {
-    const card = document.createElement("article"); card.className = "video-card";
+  videos.forEach((v, index) => {
+    const card = document.createElement("article"); 
+    card.className = "video-card";
     const username = v.profiles?.username || "creator";
     const likeCount = v.likes?.[0]?.count || 0, repostCount = v.reposts?.[0]?.count || 0;
     const isFollowing = following.includes(v.owner_id);
     const isOwner = user && v.owner_id === user.id;
 
+    // Use data-src for memory optimization on low-end devices
     card.innerHTML = `
-      <video class="video-player" loop playsinline preload="metadata" muted src="${v.video_url}"></video>
+      <video class="video-player" loop playsinline preload="metadata" muted data-src="${v.video_url}"></video>
       <div class="video-gradient"></div>
       <div class="video-info">
         <div class="creator-row">
@@ -306,23 +311,48 @@ async function loadFeed() {
     };
 
     feed.appendChild(card);
-  }
+  });
+
   setupObserver();
 }
 
+// Low-End Device Optimized Intersection Observer
 function setupObserver() {
   if (observer) observer.disconnect();
-  observer = new IntersectionObserver(entries => entries.forEach(e => {
-    const v = e.target.querySelector("video");
-    if (e.isIntersecting && e.intersectionRatio > 0.6) {
-      document.querySelectorAll("video").forEach(x => x !== v && x.pause());
-      v.play().catch(() => {});
-    } else {
-      v.pause();
-    }
-  }), { threshold: [0.6] });
   
-  document.querySelectorAll(".video-card").forEach(x => observer.observe(x));
+  const cards = Array.from(document.querySelectorAll(".video-card"));
+  
+  observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      const card = e.target;
+      const v = card.querySelector("video");
+      const cardIndex = cards.indexOf(card);
+
+      if (e.isIntersecting && e.intersectionRatio > 0.6) {
+        // Preload video stream for current, previous, and next item only
+        [cardIndex - 1, cardIndex, cardIndex + 1].forEach(i => {
+          if (cards[i]) {
+            const targetVideo = cards[i].querySelector("video");
+            if (targetVideo && !targetVideo.src) {
+              targetVideo.src = targetVideo.dataset.src;
+            }
+          }
+        });
+
+        document.querySelectorAll("video").forEach(x => {
+          if (x !== v) x.pause();
+        });
+        
+        if (v.src) {
+          v.play().catch(() => {});
+        }
+      } else {
+        v.pause();
+      }
+    });
+  }, { threshold: [0.6] });
+
+  cards.forEach(x => observer.observe(x));
 }
 
 function safeName(n) { return n.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80); }
@@ -339,7 +369,7 @@ supabase.auth.onAuthStateChange(async (_event, session) => {
       .from("profiles")
       .select("username, is_admin")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
     $("#currentUser").textContent = "@" + (profile?.username || user.email);
 
@@ -347,9 +377,6 @@ supabase.auth.onAuthStateChange(async (_event, session) => {
     if (adminBtn) {
       adminBtn.classList.toggle("hidden", !profile?.is_admin);
     }
-
-    loadFeed();
-  } else {
-    loadFeed();
   }
+  loadFeed();
 });
