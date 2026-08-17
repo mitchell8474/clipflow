@@ -101,19 +101,15 @@ async function loadFeed() {
     if (pData) profile = pData;
   }
 
-  // 2. Query Videos (with Relational fallback)
+  // 2. Query Videos (Explicitly referencing owner_id relation)
   let { data: videos, error } = await supabase
     .from("videos")
-    .select("id, owner_id, caption, video_url, created_at, profiles(username), likes(count), reposts(count)")
+    .select("id, owner_id, caption, video_url, created_at, profiles!owner_id(username), likes(count), reposts(count)")
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.warn("Relational select failed, trying flat select:", error.message);
-    const fallback = await supabase
-      .from("videos")
-      .select("id, owner_id, caption, video_url, created_at")
-      .order("created_at", { ascending: false });
-    videos = fallback.data || [];
+    console.error("Error fetching videos:", error.message);
+    videos = [];
   }
 
   const following = (profile.following || []).map(x => x.following_id);
