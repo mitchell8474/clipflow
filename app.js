@@ -73,71 +73,135 @@ $("#uploadForm").onsubmit = async e => {
   try {
     msg("#uploadMessage","Uploading...");
     const path = `${user.id}/${crypto.randomUUID()}-${safeName(file.name)}`;
-    const { error: uploadError } = await supabase.storage.from("videos").upload(path,file,{contentType:file.type,upsert:false});
+    const { error: uploadError } = await supabase.storage.from("videos").upload(path, file, { contentType: file.type, upsert: false });
     if (uploadError) throw uploadError;
-    const { data:urlData } = supabase.storage.from("videos").getPublicUrl(path);
+    
+    const { data: urlData } = supabase.storage.from("videos").getPublicUrl(path);
     const { error } = await supabase.from("videos").insert({
-      owner_id:user.id, storage_path:path, video_url:urlData.publicUrl, caption:$("#caption").value.trim()
+      owner_id: user.id, storage_path: path, video_url: urlData.publicUrl, caption: $("#caption").value.trim()
     });
     if (error) throw error;
+    
     $("#uploadForm").reset(); $("#uploadModal").classList.add("hidden"); msg("#uploadMessage","");
     loadFeed();
-  } catch(e) { console.error(e); msg("#uploadMessage",e.message); }
+  } catch(e) { console.error(e); msg("#uploadMessage", e.message); }
 };
 
 async function loadFeed() {
-  const { data: profile, error: pe } = await supabase.from("profiles").select("username,following:following(following_id),liked:likes(video_id),reposted:reposts(video_id)").eq("id",user.id).single();
-  if (pe) return console.error(pe);
-  const { data: vids, error } = await supabase.from("videos").select("id,owner_id,caption,video_url,created_at,profiles(username),likes(count),reposts(count)").order("created_at",{ascending:false});
-  if (error) return console.error(error);
-  let videos = vids || [];
-  const following = (profile.following || []).map(x=>x.following_id);
-  if (feedMode === "following") videos = videos.filter(v => following.includes(v.owner_id) || v.owner_id === user.id);
-  const liked = new Set((profile.liked || []).map(x=>x.video_id));
-  const reposted = new Set((profile.reposted || []).map(x=>x.video_id));
-
   const feed = $("#feed"); feed.innerHTML = "";
-  if (!videos.length) {
-    feed.innerHTML = `<section class="video-card"><div style="margin:auto;text-align:center"><h2>No videos here yet.</h2><p>Upload one or follow a creator.</p></div></section>`; return;
+
+  // 1. Fetch User Profile Relations safely
+  let profile = { following: [], liked: [], reposted: [] };
+  if (user) {
+    const { data: pData } = await supabase
+      .from("profiles")
+      .select("username, following:following(following_id), liked:likes(video_id), reposted:reposts(video_id)")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (pData) profile = pData;
   }
 
+  // 2. Query Videos (with Relational fallback)
+  let { data: videos, error } = await supabase
+    .from("videos")
+    .select("id, owner_id, caption, video_url, created_at, profiles(username), likes(count), reposts(count)")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.warn("Relational select failed, trying flat select:", error.message);
+    const fallback = await supabase
+      .from("videos")
+      .select("id, owner_id, caption, video_url, created_at")
+      .order("created_at", { ascending: false });
+    videos = fallback.data || [];
+  }
+
+  const following = (profile.following || []).map(x => x.following_id);
+  if (feedMode === "following" && user) {
+    videos = (videos || []).filter(v => following.includes(v.owner_id) || v.owner_id === user.id);
+  }
+
+  const liked = new Set((profile.liked || []).map(x => x.video_id));
+  const reposted = new Set((profile.reposted || []).map(x => x.video_id));
+
+  if (!videos || !videos.length) {
+    feed.innerHTML = `<section class="video-card"><div style="margin:auto;text-align:center"><h2>No videos here yet.</h2><p>Upload one to get started!</p></div></section>`; 
+    return;
+  }
+
+  // 3. Build & Render Cards
   for (const v of videos) {
-    const card = document.createElement("article"); card.className="video-card";
-    const username = v.profiles?.username || "user";
+    const card = document.createElement("article"); card.className = "video-card";
+    const username = v.profiles?.username || "creator";
     const likeCount = v.likes?.[0]?.count || 0, repostCount = v.reposts?.[0]?.count || 0;
     const isFollowing = following.includes(v.owner_id);
-    card.innerHTML = `<video class="video-player" loop playsinline preload="metadata" src="${v.video_url}"></video>
-      <div class="video-gradient"></div><div class="video-info"><div class="creator-row">
-      <button class="creator">@${esc(username)}</button><button class="follow-btn ${isFollowing?"following":""}">${v.owner_id===user.id?"You":isFollowing?"Following":"Follow"}</button>
-      </div><p class="caption">${esc(v.caption||"")}</p></div>
-      <div class="actions"><button class="action like-btn ${liked.has(v.id)?"liked":""}"><span class="icon">♥</span><span>${likeCount}</span></button>
-      <button class="action repost-btn ${reposted.has(v.id)?"reposted":""}"><span class="icon">↻</span><span>${repostCount}</span></button></div>`;
-    const followBtn=card.querySelector(".follow-btn"), likeBtn=card.querySelector(".like-btn"), repostBtn=card.querySelector(".repost-btn");
-    followBtn.disabled=v.owner_id===user.id;
-    followBtn.onclick=async()=>{const {error}=await supabase.rpc("toggle_follow",{target_user_id:v.owner_id}); if(error) alert(error.message); else loadFeed();};
-    likeBtn.onclick=async()=>{const {error}=await supabase.rpc("toggle_like",{target_video_id:v.id}); if(error) alert(error.message); else loadFeed();};
-    repostBtn.onclick=async()=>{const {error}=await supabase.rpc("toggle_repost",{target_video_id:v.id}); if(error) alert(error.message); else loadFeed();};
+    const isOwner = user && v.owner_id === user.id;
+
+    card.innerHTML = `
+      <video class="video-player" loop playsinline preload="metadata" muted src="${v.video_url}"></video>
+      <div class="video-gradient"></div>
+      <div class="video-info">
+        <div class="creator-row">
+          <button class="creator">@${esc(username)}</button>
+          <button class="follow-btn ${isFollowing ? "following" : ""}">${isOwner ? "You" : isFollowing ? "Following" : "Follow"}</button>
+        </div>
+        <p class="caption">${esc(v.caption || "")}</p>
+      </div>
+      <div class="actions">
+        <button class="action like-btn ${liked.has(v.id) ? "liked" : ""}"><span class="icon">♥</span><span>${likeCount}</span></button>
+        <button class="action repost-btn ${reposted.has(v.id) ? "reposted" : ""}"><span class="icon">↻</span><span>${repostCount}</span></button>
+      </div>`;
+
+    const followBtn = card.querySelector(".follow-btn"), likeBtn = card.querySelector(".like-btn"), repostBtn = card.querySelector(".repost-btn");
+    followBtn.disabled = isOwner;
+
+    followBtn.onclick = async () => { 
+      const { error } = await supabase.rpc("toggle_follow", { target_user_id: v.owner_id }); 
+      if (error) alert(error.message); else loadFeed(); 
+    };
+    likeBtn.onclick = async () => { 
+      const { error } = await supabase.rpc("toggle_like", { target_video_id: v.id }); 
+      if (error) alert(error.message); else loadFeed(); 
+    };
+    repostBtn.onclick = async () => { 
+      const { error } = await supabase.rpc("toggle_repost", { target_video_id: v.id }); 
+      if (error) alert(error.message); else loadFeed(); 
+    };
+
     feed.appendChild(card);
   }
   setupObserver();
 }
 
-function setupObserver(){
-  if(observer) observer.disconnect();
-  observer=new IntersectionObserver(entries=>entries.forEach(e=>{
-    const v=e.target.querySelector("video");
-    if(e.isIntersecting && e.intersectionRatio>.6){document.querySelectorAll("video").forEach(x=>x!==v&&x.pause());v.play().catch(()=>{});}
-    else v.pause();
-  }),{threshold:[.6]});
-  document.querySelectorAll(".video-card").forEach(x=>observer.observe(x));
+function setupObserver() {
+  if (observer) observer.disconnect();
+  observer = new IntersectionObserver(entries => entries.forEach(e => {
+    const v = e.target.querySelector("video");
+    if (e.isIntersecting && e.intersectionRatio > 0.6) {
+      document.querySelectorAll("video").forEach(x => x !== v && x.pause());
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
+  }), { threshold: [0.6] });
+  
+  document.querySelectorAll(".video-card").forEach(x => observer.observe(x));
 }
-function safeName(n){return n.replace(/[^a-zA-Z0-9._-]/g,"_").slice(-80)}
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));}
 
-supabase.auth.onAuthStateChange((_event,session)=>{
-  user=session?.user||null;
-  $("#authScreen").classList.toggle("hidden",!!user); $("#app").classList.toggle("hidden",!user);
-  if(user) supabase.from("profiles").select("username").eq("id",user.id).single().then(({data})=>{
-    $("#currentUser").textContent="@"+(data?.username||user.email); loadFeed();
-  });
+function safeName(n) { return n.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c])); }
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  user = session?.user || null;
+  $("#authScreen").classList.toggle("hidden", !!user); 
+  $("#app").classList.toggle("hidden", !user);
+  
+  if (user) {
+    supabase.from("profiles").select("username").eq("id", user.id).single().then(({ data }) => {
+      $("#currentUser").textContent = "@" + (data?.username || user.email); 
+      loadFeed();
+    });
+  } else {
+    loadFeed();
+  }
 });
