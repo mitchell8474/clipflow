@@ -16,6 +16,51 @@ body {
   display: none !important;
 }
 
+/* --- ClipFlow Branding --- */
+.brand-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.brand-logo .logo-icon {
+  font-size: 28px;
+  background: linear-gradient(135deg, #ff0050 0%, #00f2fe 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #ffffff 0%, #cccccc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 12px;
+}
+
+.brand-header .logo-icon {
+  font-size: 20px;
+}
+
+.brand-header .brand-name {
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #ff0050 0%, #00f2fe 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 /* --- Auth Screen --- */
 .auth-screen {
   display: flex;
@@ -32,12 +77,6 @@ body {
   width: 100%;
   max-width: 380px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-}
-
-.auth-card h1 {
-  text-align: center;
-  margin-bottom: 20px;
-  font-size: 24px;
 }
 
 .tabs {
@@ -127,7 +166,6 @@ body {
   border-bottom: 2px solid #fff;
 }
 
-/* --- Redesigned Upload Button --- */
 .upload-btn {
   display: inline-flex;
   align-items: center;
@@ -178,13 +216,14 @@ body {
   color: #aaa;
 }
 
-/* --- Feed Section --- */
+/* --- Feed & Center Lock Section --- */
 .feed-container {
   flex: 1;
   overflow-y: scroll;
-  snap-type: y mandatory;
+  scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
   height: 100vh;
+  -webkit-overflow-scrolling: touch;
 }
 
 .video-card {
@@ -193,7 +232,8 @@ body {
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
-  snap-align: start;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
   background: #000;
   display: flex;
   justify-content: center;
