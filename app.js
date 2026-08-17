@@ -167,39 +167,84 @@ async function loadFeed() {
         <p class="caption">${esc(v.caption || "")}</p>
       </div>
       <div class="actions">
-        <button class="action like-btn ${liked.has(v.id) ? "liked" : ""}"><span class="icon">♥</span><span>${likeCount}</span></button>
-        <button class="action repost-btn ${reposted.has(v.id) ? "reposted" : ""}"><span class="icon">↻</span><span>${repostCount}</span></button>
+        <button class="action like-btn ${liked.has(v.id) ? "liked" : ""}"><span class="icon">♥</span><span class="count">${likeCount}</span></button>
+        <button class="action repost-btn ${reposted.has(v.id) ? "reposted" : ""}"><span class="icon">↻</span><span class="count">${repostCount}</span></button>
       </div>`;
 
-    const followBtn = card.querySelector(".follow-btn"), likeBtn = card.querySelector(".like-btn"), repostBtn = card.querySelector(".repost-btn");
+    const followBtn = card.querySelector(".follow-btn");
+    const likeBtn = card.querySelector(".like-btn");
+    const repostBtn = card.querySelector(".repost-btn");
     followBtn.disabled = isOwner;
 
-    // Instant UI toggle for follow button
+    // Direct Follow toggle without feed reload
     followBtn.onclick = async () => { 
       if (!user) return alert("Please sign in to follow creators.");
 
       const currentlyFollowing = followBtn.classList.contains("following");
-      followBtn.classList.toggle("following", !currentlyFollowing);
-      followBtn.textContent = !currentlyFollowing ? "Following" : "Follow";
+      
+      // Update all follow buttons across the app for this creator
+      document.querySelectorAll(".video-card").forEach(c => {
+        if (c.querySelector(".creator").textContent === `@${username}`) {
+          const btn = c.querySelector(".follow-btn");
+          if (btn && !btn.disabled) {
+            btn.classList.toggle("following", !currentlyFollowing);
+            btn.textContent = !currentlyFollowing ? "Following" : "Follow";
+          }
+        }
+      });
 
       const { error } = await supabase.rpc("toggle_follow", { target_user_id: v.owner_id }); 
       if (error) {
-        // Revert UI if server action fails
-        followBtn.classList.toggle("following", currentlyFollowing);
-        followBtn.textContent = currentlyFollowing ? "Following" : "Follow";
+        // Revert on failure
+        document.querySelectorAll(".video-card").forEach(c => {
+          if (c.querySelector(".creator").textContent === `@${username}`) {
+            const btn = c.querySelector(".follow-btn");
+            if (btn && !btn.disabled) {
+              btn.classList.toggle("following", currentlyFollowing);
+              btn.textContent = currentlyFollowing ? "Following" : "Follow";
+            }
+          }
+        });
         alert(error.message); 
-      } else {
-        loadFeed(); 
       }
     };
 
+    // Direct Like toggle without feed reload
     likeBtn.onclick = async () => { 
+      if (!user) return alert("Please sign in to like videos.");
+
+      const countEl = likeBtn.querySelector(".count");
+      const isLiked = likeBtn.classList.contains("liked");
+      let currentCount = parseInt(countEl.textContent, 10) || 0;
+
+      likeBtn.classList.toggle("liked", !isLiked);
+      countEl.textContent = !isLiked ? currentCount + 1 : Math.max(0, currentCount - 1);
+
       const { error } = await supabase.rpc("toggle_like", { target_video_id: v.id }); 
-      if (error) alert(error.message); else loadFeed(); 
+      if (error) {
+        likeBtn.classList.toggle("liked", isLiked);
+        countEl.textContent = currentCount;
+        alert(error.message); 
+      }
     };
+
+    // Direct Repost toggle without feed reload
     repostBtn.onclick = async () => { 
+      if (!user) return alert("Please sign in to repost videos.");
+
+      const countEl = repostBtn.querySelector(".count");
+      const isReposted = repostBtn.classList.contains("reposted");
+      let currentCount = parseInt(countEl.textContent, 10) || 0;
+
+      repostBtn.classList.toggle("reposted", !isReposted);
+      countEl.textContent = !isReposted ? currentCount + 1 : Math.max(0, currentCount - 1);
+
       const { error } = await supabase.rpc("toggle_repost", { target_video_id: v.id }); 
-      if (error) alert(error.message); else loadFeed(); 
+      if (error) {
+        repostBtn.classList.toggle("reposted", isReposted);
+        countEl.textContent = currentCount;
+        alert(error.message); 
+      }
     };
 
     feed.appendChild(card);
