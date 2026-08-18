@@ -1,3 +1,39 @@
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
+body { background: #000; color: #fff; overflow: hidden; }
+.hidden { display: none !important; }
+
+/* Auth */
+#authScreen { height: 100vh; display: flex; align-items: center; justify-content: center; background: #111; }
+.auth-box { background: #222; padding: 2rem; border-radius: 8px; width: 90%; max-width: 400px; text-align: center; }
+
+/* Glassy Auth Tabs */
+.auth-tabs { 
+  display: flex; 
+  margin-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 5px;
+}
+.tab { flex: 1; padding: 10px; background: none; border: none; color: #888; cursor: pointer; font-size: 1rem; transition: all 0.2s; }
+.tab.active { 
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+#authForm input { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #444; background: #333; color: white; }
+.msg { color: #aaa; font-size: 0.9rem; margin-top: 10px; }
+
+/* App Layout */
+.top-nav { position: fixed; top: 0; width: 100%; display: flex; justify-content: center; gap: 20px; padding: 15px; z-index: 10; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); }
+.nav-btn { background: none; border: none; color: #888; font-weight: bold; font-size: 1.1rem; cursor: pointer; }
+.nav-btn.active { color: #fff; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
+
+/* Centered Bottom Nav */
 .bottom-nav { 
   position: fixed; 
   bottom: 0; 
@@ -5,7 +41,7 @@
   height: 60px; 
   background: #000; 
   display: flex; 
-  justify-content: space-between; /* Pushes outer buttons to the edges */
+  justify-content: space-between; 
   align-items: center; 
   border-top: 1px solid #222; 
   z-index: 10; 
@@ -13,7 +49,7 @@
 }
 .b-nav-btn { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; }
 
-/* Force Upload button to dead-center and make it look like a floating action button */
+/* Floating Upload Button Dead-Center */
 #uploadOpenBtn { 
   position: absolute; 
   left: 50%; 
@@ -29,4 +65,116 @@
   padding: 0 !important; 
   font-size: 1.5rem;
   box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Feed */
+.feed-container { height: 100vh; width: 100vw; overflow-y: scroll; scroll-snap-type: y mandatory; }
+.video-card { position: relative; height: 100vh; width: 100vw; scroll-snap-align: start; background: #111; }
+
+/* Video Player with Proper Scaling */
+.video-player { 
+  width: 100%; 
+  height: 100%; 
+  object-fit: contain; 
+  background: #000; 
+}
+.video-gradient { position: absolute; bottom: 0; width: 100%; height: 40%; background: linear-gradient(transparent, rgba(0,0,0,0.8)); pointer-events: none; }
+
+/* Overlay UI */
+.video-info { position: absolute; bottom: 80px; left: 15px; width: 70%; z-index: 2; }
+.creator-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+.creator { font-weight: bold; font-size: 1.1rem; background: none; border: none; color: white; cursor: pointer; }
+.caption { font-size: 0.95rem; line-height: 1.3; text-shadow: 1px 1px 2px black; }
+
+.actions { position: absolute; bottom: 90px; right: 15px; display: flex; flex-direction: column; gap: 20px; align-items: center; z-index: 2; }
+.action { background: none; border: none; color: white; display: flex; flex-direction: column; align-items: center; cursor: pointer; gap: 5px; }
+.action .icon { font-size: 2rem; filter: drop-shadow(1px 1px 2px black); transition: transform 0.2s; }
+.action:active .icon { transform: scale(0.9); }
+.like-btn.liked .icon { color: #ea4335; }
+.repost-btn.reposted .icon { color: #fbbc05; }
+.action .count { font-size: 0.8rem; font-weight: bold; text-shadow: 1px 1px 2px black; }
+
+/* Modals */
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100; display: flex; align-items: center; justify-content: center; }
+.modal-content { background: #222; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; position: relative; }
+.close { position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; color: #aaa; }
+#uploadForm input, #uploadForm textarea { width: 100%; margin: 10px 0; padding: 10px; background: #333; color: white; border: 1px solid #444; border-radius: 4px; }
+
+/* Comments Section */
+.comments-modal-content { height: 70vh; display: flex; flex-direction: column; justify-content: space-between; }
+#commentsList { flex: 1; overflow-y: auto; margin: 15px 0; display: flex; flex-direction: column; gap: 15px; padding-right: 5px; }
+.comment-item { display: flex; gap: 10px; }
+.comment-item.reply { margin-left: 30px; margin-top: 10px; border-left: 2px solid #444; padding-left: 10px; }
+.comment-body { flex: 1; }
+.comment-user { font-weight: bold; color: #ddd; font-size: 0.9rem; margin-bottom: 2px; }
+.comment-text { font-size: 0.95rem; line-height: 1.3; }
+.comment-actions { display: flex; gap: 15px; margin-top: 5px; font-size: 0.8rem; color: #888; align-items: center; }
+.c-action-btn { background: none; border: none; color: #888; cursor: pointer; }
+.c-action-btn:hover { color: #fff; }
+.creator-liked { color: #ea4335; font-size: 0.75rem; display: flex; align-items: center; gap: 3px; margin-top: 2px; }
+.c-like-btn.liked { color: #ea4335; }
+.comment-right { display: flex; flex-direction: column; align-items: center; color: #888; font-size: 0.8rem; gap: 3px; cursor: pointer; }
+
+#replyingToIndicator { font-size: 0.8rem; color: #aaa; padding: 5px 0; display: flex; justify-content: space-between; }
+#cancelReplyBtn { background: none; border: none; color: #ea4335; cursor: pointer; font-weight: bold; }
+
+#commentForm { display: flex; gap: 10px; margin-top: 10px; }
+#commentInput { flex: 1; padding: 10px; background: #333; color: white; border: 1px solid #444; border-radius: 20px; outline: none; }
+
+/* =========================================
+   LIQUID GLASS EFFECT FOR MAIN BUTTONS
+   ========================================= */
+
+#authForm button, 
+#uploadForm button, 
+#adminModal button,
+#commentForm button,
+.follow-btn {
+  background: rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.4) !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+  color: #fff !important;
+  border-radius: 12px !important;
+  transition: all 0.3s ease !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  cursor: pointer;
+  padding: 10px;
+  width: 100%;
+}
+
+/* Fix width for specific buttons */
+.follow-btn { width: auto; padding: 4px 12px !important; border-radius: 20px !important; }
+#commentForm button { width: auto; padding: 0 20px; font-weight: bold; }
+
+/* Glass effect on hover */
+#authForm button:hover, 
+#uploadForm button:hover, 
+#adminModal button:hover,
+#commentForm button:hover,
+.follow-btn:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 8px 32px 0 rgba(255, 255, 255, 0.1) !important;
+  transform: translateY(-2px);
+}
+
+/* Active/Click effect */
+#authForm button:active, 
+#uploadForm button:active, 
+#adminModal button:active,
+#commentForm button:active,
+.follow-btn:active {
+  transform: translateY(1px);
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Adjust the Follow button when already following */
+.follow-btn.following {
+  background: rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #ccc !important;
 }
